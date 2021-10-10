@@ -1,0 +1,44 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Provision nat gateway for private subnets
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+
+Resources:
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-NatGateway1EIP
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PublicSubnet1ID
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-NatGateway
+
+  PrivateGatewayRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+      RouteTableId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PrivateRTID

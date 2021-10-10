@@ -1,0 +1,76 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Provision SFTP server with EC2 Auto Scaling group 
+  place under a LoadBalancer
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+  InstanceType:
+    Description: Specify the capacity of the instance
+    Type: String
+    Default: t2.micro
+  KeyName:
+    Description: The ssh key to use for login
+    Type: String
+    Default: aws2-oregon-key
+
+Mappings:
+  AWSRegion2AMI:
+    us-west-2:
+      AMI: ami-0e999cbd62129e3b1
+    us-east-1:
+      AMI: ami-03368e982f317ae48
+    us-east-2:
+      AMI: ami-0233c2d874b811deb
+
+Resources:
+  SFTPServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [ AWSRegion2AMI, !Ref "AWS::Region", "AMI" ]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-SFTPServerSG
+      SubnetId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PublicSubnet1ID
+      UserData:
+        Fn::Base64: !Sub |
+          #! /bin/bash
+          yum update -y
+          yum install httpd -y
+          echo This is the SFTP server > /var/www/html/index.html
+          systemctl enable --now httpd
+          systemctl status httpd
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-SFTPServer
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  SFTPServer:
+    Description: ID of the SFTPServer
+    Value: !Ref SFTPServer
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-SFTPServer
+
+  SFTPServerPublicIP:
+    Description: ID of the SFTPServer
+    Value: !GetAtt SFTPServer.PublicIp
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-SFTPServerPublicIP

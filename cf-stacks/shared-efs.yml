@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  Provision an EBS volume to be shared by all components of the systems
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+
+Resources:
+  SharedEFS:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-shared-efs
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+  
+  EFSMountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref SharedEFS
+      SubnetId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PublicSubnet1ID
+      SecurityGroups:
+      - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-SharedEfsSG
+
+  EFSMountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref SharedEFS
+      SubnetId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PublicSubnet2ID
+      SecurityGroups:
+      - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-SharedEfsSG
+
+Outputs:
+  FIleSystemId:
+    Description: Return the ID of the provisioned file system
+    Value: !Ref SharedEFS
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-Filesystem
+
+  EFSMMountTarget1ID:
+    Description: Return the IP address for the mount target 1
+    Value: !Ref EFSMountTarget1
+  
+  EFSMMountTarget1IP:
+    Description: Return the IP address for the mount target 1
+    Value: !GetAtt EFSMountTarget1.IpAddress
+
+  EFSMMountTarget2ID:
+    Description: Return the IP address for the mount target 1
+    Value: !Ref EFSMountTarget2
+
+  EFSMMountTarget2IP:
+    Description: Return the IP address for the mount target 1
+    Value: !GetAtt EFSMountTarget2.IpAddress

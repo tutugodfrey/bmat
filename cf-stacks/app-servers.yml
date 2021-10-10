@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Provision Web server with EC2 Auto Scaling group 
+  place under a LoadBalancer
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+
+  InstanceType:
+    Description: Specify the capacity of the instance
+    Type: String
+    Default: t2.micro
+
+  KeyName:
+    Description: The ssh key to use for login
+    Type: String
+    Default: aws2-oregon-key
+
+Mappings:
+  AWSRegion2AMI:
+    us-west-2:
+      AMI: ami-0e999cbd62129e3b1
+    us-east-1:
+      AMI: ami-03368e982f317ae48
+    us-east-2:
+      AMI: ami-0233c2d874b811deb
+
+Resources:
+  WebServerLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${ProjectName}-${Environment}-Launch-Template
+      LaunchTemplateData:
+        ImageId: !FindInMap [ AWSRegion2AMI, !Ref "AWS::Region", AMI]
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+         - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-WebServerSG
+        UserData:
+          Fn::Base64: !Sub |
+            #! /bin/bash
+            yum update -y
+            yum install httpd -y
+            echo Hello world > /var/www/html/index.html
+            systemctl enable --now httpd
+            systemctl status httpd
+  
+  WebServerASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref WebServerLaunchTemplate
+        Version: 1
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PublicSubnets
+      DesiredCapacity: 1
+      MinSize: 1
+      MaxSize: 3
+      HealthCheckGracePeriod: 180
+      HealthCheckType: ELB
+      TargetGroupARNs:
+      - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-WebTargetGroupARN
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-WebServer
+          PropagateAtLaunch: Yes
+
+Outputs:
+  LaunchTemplateARN:
+    Description: ARN of launch WebServer Launch Template
+    Value: !Ref WebServerLaunchTemplate
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-WebServer-LaunchTemplate

@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Provision Postgres RDS Database
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+  DBInstanceClass:
+    Description: Specify the capacity of the database instance
+    Type: String
+    Default: db.t2.micro
+    AllowedValues:
+      - db.t2.micro
+      - db.t2.medium
+  DBEngineVersion:
+    Description: Database engine version to provision
+    Type: String
+    Default: "12.5"
+    AllowedValues:
+      - "12.5"
+  AllocatedStorage:
+    Description: Storage size for the database
+    Type: String
+    Default: 20
+  DBName:
+    Description: Name of the database to create
+    Type: String
+    Default: bmatdatabase
+  DBPort:
+    Description: Database Port
+    Type: Number
+    Default: 5432
+  DBMasterPassword:
+    Description: >
+      Password to connect to the Database.
+      Should be provided dynamically.
+      During execution
+    Type: String
+  DBMasterUsername:
+    Description: Username for the database
+    Type: String
+    Default: bmatdbuser
+  DBSnapshotIdentifier:
+    Description: Suffix for DB snapshot identifier
+    Type: String
+    Default: snapshotidentitfier
+  MultiAZ:
+    Description: Specify whether DB should be provisioned in multi AZ
+    Type: String
+    Default: False
+    AllowedValues:
+    - False
+    - True
+  PubliclyAccessible:
+    Description: Specify whether DB should be publicly accessible
+    Type: String
+    Default: True
+    AllowedValues:
+    - False
+    - True
+  CreateReadReplica:
+    Description: Specify whether Read Replica should be created for the database
+    Type: String
+    Default: True
+    AllowedValues:
+    - False
+    - True
+
+Conditions:
+  CreateDBReadReplica: !Equals
+    - !Ref CreateReadReplica
+    - True
+
+  UseDBSnapshot: 
+    !Not [!Equals [!Ref DBSnapshotIdentifier, snapshotidentitfier]]
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub ${ProjectName}-${Environment}-DBSubnetGroup
+      DBSubnetGroupDescription: !Sub ${ProjectName}-${Environment} DB Subnet Group
+      SubnetIds:
+        - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PrivateSubnet1ID
+        - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PrivateSubnet2ID
+      # Tags:
+
+  PrimaryRdsDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub ${ProjectName}-${Environment}-database
+      DBName: !Ref DBName
+      Engine: postgres
+      EngineVersion: !Ref DBEngineVersion
+      DBInstanceClass: !Ref DBInstanceClass
+      AvailabilityZone:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PrivateSubnet1-AZ
+      VPCSecurityGroups:
+        - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-RDSDatabase-SGID 
+      MasterUsername: !Ref DBMasterUsername
+      MasterUserPassword: !Ref DBMasterPassword
+      Port: !Ref DBPort
+      MultiAZ: !Ref MultiAZ
+      PubliclyAccessible: !Ref PubliclyAccessible
+      AllocatedStorage: !Ref AllocatedStorage
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      DBSnapshotIdentifier:
+        !If [ UseDBSnapshot, !Ref DBSnapshotIdentifier, !Ref "AWS::NoValue" ]
+
+  ReplicaDatabase:
+    Type: AWS::RDS::DBInstance
+    Condition: CreateDBReadReplica
+    Properties:
+      DBInstanceIdentifier: !Sub ${ProjectName}-${Environment}-replica-database
+      SourceDBInstanceIdentifier: !Ref PrimaryRdsDatabase
+      MultiAZ: !Ref MultiAZ
+      PubliclyAccessible: !Ref PubliclyAccessible
+
+Outputs:
+  DBInstanceName:
+    Description: The name of the database instance
+    Value: !Ref PrimaryRdsDatabase
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-DBInstanceName
+
+  DBPort:
+    Description: Port number to connect to the databas
+    Value: !GetAtt PrimaryRdsDatabase.Endpoint.Port
+
+  DBSubnetGroupID:
+    Description: ID of the RDS DB subnet group
+    Value: !Ref DBSubnetGroup
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-DBSubnetGroupID
+
+  DBSnapshotIdenfier:
+    Description: Identifier for the db snapshot
+    Value: !Sub ${ProjectName}-${Environment}-${DBSnapshotIdentifier}
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-SnapshotIdentifier
+
+  DBEndPoint:
+    Description: Endpoint or hostname to connect to the database
+    Value: !GetAtt PrimaryRdsDatabase.Endpoint.Address
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-DBHost
+
+  ReplicaDBEndpoint:
+    Description: The host address of the replica DB
+    Condition: CreateDBReadReplica
+    Value: !GetAtt ReplicaDatabase.Endpoint.Address
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-Replica-DB-Host

@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Create read replica for RDS Database
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+  DBInstanceIdentifierPrefix:
+    Description: Identifier name of the replica DB
+    Type: String
+    Default: replica-db
+  DBSnapshotIdentifier:
+    Description: Identifier for the snapshot for the database
+    Type: String
+    Default: dca-dev-snapshot1
+    AllowedValues:
+    - dca-dev-snapshot
+    - dca-dev-snapshot1
+
+Resources:
+   RDSReplicaDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      # DBName: !Sub ${ProjectName}-${Environment}-${DBInstanceIdentifierPrefix}
+      # SourceDBInstanceIdentifier should be commented out to promote the read replica to master
+      # and DBSnapshotIdentifier should be uncommented to promote to a standalone database
+      SourceDBInstanceIdentifier:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-DBInstanceName
+      # DBSnapshotIdentifier: !Ref DBSnapshotIdentifier
+      MultiAZ: False
+      PubliclyAccessible: False
+
+
+Outputs:
+  ReplicaDBInstanceName:
+    Description: Name of the RDS read replica
+    Value: !Ref RDSReplicaDB
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-RDS-ReplicaIdentifier
+  
+  ReplicaDBPort:
+    Description: Port to connect to the Replica DB
+    Value: !GetAtt RDSReplicaDB.Endpoint.Port
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-ReplicaDB-PORT
+  
+  ReplicaDBEndpoint:
+    Description: The host address of the replica DB
+    Value: !GetAtt RDSReplicaDB.Endpoint.Address
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-Replica-DB-Host

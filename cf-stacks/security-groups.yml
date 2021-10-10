@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deploy and manage security group needed across the architecture
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+  PublicCidrIp:
+    Description: Public Ip Cidr range
+    Type: String
+    Default: 0.0.0.0/0
+
+Resources:
+  LoadBalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-${Environment}-LBSG
+      GroupDescription: !Sub ${ProjectName} ${Environment} Security Group
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref PublicCidrIp
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref PublicCidrIp
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref PublicCidrIp
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-LB-SG
+  
+  WebServerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ProjectName}-${Environment}-WebServerSG
+      GroupName: !Sub ${ProjectName}-${Environment}-WebServer Security Group
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref PublicCidrIp
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref PublicCidrIp
+        - IpProtocol: tcp
+          FromPort: 1220
+          ToPort: 1220
+          CidrIp:
+            Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-WebServer-SG
+
+  SFTPServerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ProjectName}-${Environment}-SFTPServerSG
+      GroupName: !Sub ${ProjectName}-${Environment}-SFTPServer Security Group
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 220
+          ToPort: 220
+          CidrIp: !Ref PublicCidrIp
+        - IpProtocol: tcp
+          FromPort: 1220
+          ToPort: 1220
+          CidrIp:
+            Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-SFTPServer-SG
+
+  WorkerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ProjectName}-${Environment}-WorkerSG
+      GroupName: !Sub ${ProjectName}-${Environment}-Worker Security Group
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 1220
+          ToPort: 1220
+          CidrIp:
+            Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-Worker-SG
+
+  RDSDatabaseSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-${Environment}-Database-SG
+      GroupDescription: !Sub ${ProjectName}-${Environment} Database SG
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref WebServerSG 
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-DatabaseSG
+
+  SharedEfsSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-${Environment}-SharedEFS
+      GroupDescription: !Sub ${ProjectName} ${Environment} Shared EFS
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          CidrIp:
+            Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VpcCidr
+
+Outputs:
+  LoadBalancerSG:
+    Description: ID of Load Balancer Security group
+    Value: !Ref LoadBalancerSG
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-LoadBalancerSG
+
+  WebServerSGID:
+    Description: Security Group ID for Web Servers
+    Value: !Ref WebServerSG
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-WebServerSG
+  
+  RDSDatabaseSGID:
+    Description: SG Id of RDS Database
+    Value: !Ref RDSDatabaseSG
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-RDSDatabase-SGID
+
+  SFTPServerSG:
+    Description: Return the Security group Id of the SFTP server
+    Value: !Ref SFTPServerSG
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-SFTPServerSG
+
+  WorkerSG:
+    Description: Return the Security group Id of the SFTP server
+    Value: !Ref WorkerSG
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-WorkerSG
+
+  SharedEfsSG:
+    Description: Return the security group Id for the shared efs
+    Value: !Ref SharedEfsSG
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-SharedEfsSG

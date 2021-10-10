@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Load Balancer to distribute traffic between target in the app subnets
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+  LBName:
+    Description: Name of the Load Balancer to create
+    Type: String
+    Default: bmat-lb-server
+
+Resources:
+  WebServerLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Ref LBName
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+        - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PublicSubnet1ID
+        - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-PublicSubnet2ID
+      SecurityGroups:
+        - Fn::ImportValue: !Sub ${ProjectName}-${Environment}-LoadBalancerSG
+
+  LBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref WebTargetGroup
+      LoadBalancerArn: !Ref WebServerLB
+      Port: 80
+      Protocol: HTTP
+
+  LBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref WebTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values: [/]
+      ListenerArn: !Ref LBListener
+      Priority: 1
+
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 10
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VPC
+
+Outputs:
+  LoadBalancerARN:
+    Description: ARN of the Load Balancer
+    Value: !Ref WebServerLB
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-LoadBalancerARN
+
+  LoadBalancerDNS:
+    Description: DNS of the Load Balancer
+    Value: !GetAtt WebServerLB.DNSName
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-LoadBalancerDNS
+
+  LoadBalancerDNS2:
+    Description: DNS of the Load Balancer
+    Value: !Join ["", [http://, !GetAtt WebServerLB.DNSName]]
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-LoadBalancerDNS2
+
+  WebTargetGroupARN:
+    Description: ARN of the app target group
+    Value: !Ref WebTargetGroup
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-WebTargetGroupARN

@@ -1,0 +1,264 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Create a VPC with subnets
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+  VpcCidr:
+    Description: The cidr range of the VPC
+    Type: String
+    Default: 10.100.0.0/16
+  PublicSubnet1Cidr:
+    Description: Cidr range of public subnet 1
+    Type: String
+    Default: 10.100.1.0/24
+  PublicSubnet2Cidr:
+    Description: Cidr range of public subnet 2
+    Type: String
+    Default: 10.100.10.0/24
+  PrivateSubnet1Cidr:
+    Description: Cidr range of Private subnet 1
+    Type: String
+    Default: 10.100.20.0/24
+  PrivateSubnet2Cidr:
+    Description: Cidr range of Private subnet 2
+    Type: String
+    Default: 10.100.30.0/24
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: True
+      EnableDnsSupport: True
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-VPC
+  
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, Fn::GetAZs: ""]
+      MapPublicIpOnLaunch: True
+      CidrBlock: !Ref PublicSubnet1Cidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-PublicSubnet1
+  
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, Fn::GetAZs: ""]
+      MapPublicIpOnLaunch: True
+      CidrBlock: !Ref PublicSubnet2Cidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-PublicSubnet2
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, Fn::GetAZs: ""]
+      MapPublicIpOnLaunch: False
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-PrivateSubnet1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, Fn::GetAZs: ""]
+      MapPublicIpOnLaunch: False
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-PrivateSubnet2
+  
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-IGW
+  
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-Public-RT
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+
+  PublicRouteTableSubnetAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicRouteTableSubnetAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Environment}-PrivateRT
+  
+  PrivateRouteTableSubnetAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateRouteTableSubnetAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet2
+
+Outputs:
+  VpcID:
+    Description: ID of the VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-VPC
+  
+  VpcCidrBlock:
+    Description: Return the Cidr of the VPC
+    Value: !GetAtt VPC.CidrBlock
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-VpcCidr
+
+  PublicSubnet1ID:
+    Description: ID of PublicSubnet1
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PublicSubnet1ID
+
+  PublicSubnet1Cidr:
+    Description: Cidr Block of PublicSubnet1
+    Value: !Ref PublicSubnet1Cidr
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PublicSubnet1Cidir
+
+  PublicSubnet1AZ:
+    Description: AZ of PublicSubnet1
+    Value: !GetAtt PublicSubnet1.AvailabilityZone
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}PublicSubnet1-AZ
+
+  PublicSubnet2ID:
+    Description: ID of PublicSubnet2
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PublicSubnet2ID
+
+  PublicSubnet2Cidr:
+    Description: Cidr Block of PublicSubnet2
+    Value: !Ref PublicSubnet2Cidr
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PublicSubnet2Cidr
+
+  PublicSubnet2AZ:
+    Description: AZ of PublicSubnet2
+    Value: !GetAtt PublicSubnet2.AvailabilityZone
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}PublicSubnet2-AZ
+
+  PublicSubnets:
+    Description: Return a list of IDs of the App Subnets
+    Value:
+      Fn::Join: [",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PublicSubnets
+
+  PrivateSubnet1ID:
+    Description: ID of Private Subnet 1
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PrivateSubnet1ID
+
+  PrivateSubnet1Cidr:
+    Description: Cidr Block of PrivateSubnet1
+    Value: !Ref PrivateSubnet1Cidr
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PrivateSubnet1Cidr
+
+  PrivateSubnet1AZ:
+    Description: AZ of Private Subnet 1
+    Value: !GetAtt PrivateSubnet1.AvailabilityZone
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PrivateSubnet1-AZ
+
+  PrivateSubnet2ID:
+    Description: ID of Private Subnet 2
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PrivateSubnet2ID
+
+  PrivateSubnet2Cidr:
+    Description: Cidr Block of PrivateSubnet2
+    Value: !Ref PrivateSubnet2Cidr
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PrivateSubnet2Cidr
+
+  PrivateSubnet2AZ:
+    Description: AZ of Private Subnet 2
+    Value: !GetAtt PrivateSubnet2.AvailabilityZone
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PrivateSubnet2-AZ
+  
+  PublicRouteTableID:
+    Description: ID of public route table 
+    Value: !Ref PublicRouteTable
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PublicRouteTableID
+
+  PrivateRouteTableId:
+    Description: ID of PrivateRouteTable
+    Value: !Ref PrivateRouteTable
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PrivateRTID
+
+  PrivateSubnets:
+    Description: Subnet group for the private subnet
+    Value: !Join [",", [ !Ref PrivateSubnet2, !Ref PrivateSubnet1]]
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PrivateSubnetGroup

@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  Provision a queueing system with AWS SQS service
+
+Parameters:
+  ProjectName:
+    Description: Specify the name of the project
+    Type: String
+    Default: bmat-test
+  Environment:
+    Description:  The environment in use
+    Type: String
+    Default: Dev
+    AllowedValues:
+    - Dev
+    - Test
+    - Staging
+    - Prod
+
+  QueueName:
+    Description: Specify the name for the queue to create
+    Type: String
+    Default: bmat-test-sqs
+
+Resources:
+  SQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref QueueName
+
+Outputs:
+  QueueName:
+    Description: Return the name of the queue created
+    Value: !GetAtt SQSQueue.QueueName
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-QueueName
+
+  QueueURL:
+    Description: Return the URL of the queue
+    Value: !Ref SQSQueue
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-QueueURL
+
+  QueueArn:
+    Description: Return the ARN of the queue created
+    Value: !GetAtt SQSQueue.Arn
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-QueueARN
