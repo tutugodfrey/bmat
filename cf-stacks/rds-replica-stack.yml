@@ -37,7 +37,16 @@ Resources:
       # and DBSnapshotIdentifier should be uncommented to promote to a standalone database
       SourceDBInstanceIdentifier:
         Fn::ImportValue: !Sub ${ProjectName}-${Environment}-DBInstanceName
-      # DBSnapshotIdentifier: !Ref DBSnapshotIdentifier
+      MultiAZ: False
+      PubliclyAccessible: False
+
+   RDSReplicaDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      # DBName: !Sub ${ProjectName}-${Environment}-${DBInstanceIdentifierPrefix}
+      # SourceDBInstanceIdentifier should be commented out to promote the read replica to master
+      # and DBSnapshotIdentifier should be uncommented to promote to a standalone database
+      DBSnapshotIdentifier: !Ref DBSnapshotIdentifier
       MultiAZ: False
       PubliclyAccessible: False
 
@@ -55,8 +64,8 @@ Outputs:
     Export:
       Name: !Sub ${ProjectName}-${Environment}-ReplicaDB-PORT
   
-  ReplicaDBEndpoint:
-    Description: The host address of the replica DB
-    Value: !GetAtt RDSReplicaDB.Endpoint.Address
-    Export:
-      Name: !Sub ${ProjectName}-${Environment}-Replica-DB-Host
+  # ReplicaDBEndpoint:
+  #   Description: The host address of the replica DB
+  #   Value: !GetAtt RDSReplicaDB.Endpoint.Address
+  #   Export:
+  #     Name: !Sub ${ProjectName}-${Environment}-Replica-DB-Host

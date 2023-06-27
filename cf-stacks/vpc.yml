@@ -262,3 +262,9 @@ Outputs:
     Value: !Join [",", [ !Ref PrivateSubnet2, !Ref PrivateSubnet1]]
     Export:
       Name: !Sub ${ProjectName}-${Environment}-PrivateSubnetGroup
+
+  PublicSubnets:
+    Description: Subnet group for the public subnet
+    Value: !Join [",", [ !Ref PublicSubnet2, !Ref PublicSubnet1]]
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-PublicSubnetGroup

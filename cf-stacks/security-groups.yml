@@ -68,6 +68,7 @@ Resources:
           ToPort: 1220
           CidrIp:
             Fn::ImportValue: !Sub ${ProjectName}-${Environment}-VpcCidr
+
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-${Environment}-WebServer-SG

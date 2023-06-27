@@ -72,15 +72,15 @@ Parameters:
   CreateReadReplica:
     Description: Specify whether Read Replica should be created for the database
     Type: String
-    Default: True
+    Default: true
     AllowedValues:
-    - False
-    - True
+    - false
+    - true
 
 Conditions:
   CreateDBReadReplica: !Equals
     - !Ref CreateReadReplica
-    - True
+    - true
 
   UseDBSnapshot: 
     !Not [!Equals [!Ref DBSnapshotIdentifier, snapshotidentitfier]]
